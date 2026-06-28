@@ -107,7 +107,7 @@ def seed_demo(db) -> None:
 # --- common airframe items (regulatory + emergency) --------------------------
 
 def _common_airframe(db, ac, af, today, *, overdue_altimeter=True):
-    _add(db, ac, af, today, "Condition inspection (annual)", months_ago=-2)        # OK
+    _add(db, ac, af, today, "Annual inspection", months_ago=-2)                    # OK
     _add(db, ac, af, today, "Transponder check", months_ago=-23)                   # due soon
     _add(db, ac, af, today, "Altimeter / pitot-static system check",
          months_ago=-25 if overdue_altimeter else -3)                              # overdue/ok
@@ -183,7 +183,7 @@ def _seed_ad4(db, today):
     eng = _component(db, ac, today, "engine", "Engine", 310.0, make="Wright", model="R-3350")
     prop = _component(db, ac, today, "propeller", "Propeller", 310.0)
 
-    _add(db, ac, af, today, "Condition inspection (annual)", months_ago=-11)       # due soon
+    _add(db, ac, af, today, "Annual inspection", months_ago=-11)                   # due soon
     _add(db, ac, af, today, "Transponder check", months_ago=-2)
     _add(db, ac, af, today, "Altimeter / pitot-static system check", months_ago=-2)
     _add(db, ac, af, today, "ELT inspection", months_ago=-1)
