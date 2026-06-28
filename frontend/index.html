@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f2a43" />
+  <title>SBSF Maintenance Hub</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <button id="backBtn" class="back hidden" aria-label="Back">&#8592;</button>
+    <div class="brand" id="homeLink">
+      <span class="logo">&#9992;</span>
+      <span>SBSF Maintenance Hub</span>
+    </div>
+    <div class="spacer"></div>
+    <span id="advisory" class="advisory" title="Intervals are advisory defaults; verify with maintenance personnel.">advisory</span>
+  </header>
+
+  <main id="view" class="view">
+    <div class="loading">Loading…</div>
+  </main>
+
+  <!-- Modal host -->
+  <div id="modalRoot"></div>
+
+  <footer class="foot">
+    Advisory tool only — the signed aircraft records remain authoritative.
+    Verify all intervals against the specific aircraft, ADs and current regulations.
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
