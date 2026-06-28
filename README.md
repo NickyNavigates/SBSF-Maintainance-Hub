@@ -1,7 +1,6 @@
 # SBSF Maintenance Hub
 
-Aircraft compliance & maintenance tracking for the Superior Steel Fab flight
-department — calendar items (annual, transponder, pitot-static, ELT,
+Aircraft compliance & maintenance tracking for the Soaring by the Sea Foundation — calendar items (annual, transponder, pitot-static, ELT,
 registration, emergency equipment) and hours/cycle items (oil, 100-hr, TBO,
 mags, props, rotor/drivetrain time-life) across the fleet.
 
