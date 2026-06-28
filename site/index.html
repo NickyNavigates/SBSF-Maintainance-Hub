@@ -1,0 +1,488 @@
+<title>SBSF Maintenance Hub</title>
+<meta name="description" content="Aircraft compliance & maintenance tracker for the SBSF warbird fleet — due dates, hours, and timeline." />
+<style>
+  :root {
+    --navy:#0f2a43; --navy-2:#163a5c; --bg:#eef1f5; --card:#fff; --ink:#1d2733;
+    --muted:#6b7785; --line:#e0e5ec; --green:#1f9d57; --green-bg:#e7f6ee;
+    --amber:#c97c00; --amber-bg:#fbf0d9; --red:#cf2f3b; --red-bg:#fbe4e6; --grey:#8a96a3;
+    --shadow:0 1px 3px rgba(16,33,54,.08),0 4px 14px rgba(16,33,54,.05); --radius:13px;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; }
+  .tnum { font-variant-numeric:tabular-nums; }
+
+  .topbar { position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:10px;
+    padding:13px 16px; padding-top:max(13px,env(safe-area-inset-top));
+    background:var(--navy); color:#fff; box-shadow:0 2px 8px rgba(0,0,0,.12); }
+  .brand { display:flex; align-items:center; gap:9px; font-weight:650; letter-spacing:.2px; cursor:pointer; }
+  .brand .logo { font-size:20px; transform:rotate(45deg); display:inline-block; }
+  .topbar .spacer { flex:1; }
+  .advisory { font-size:10.5px; text-transform:uppercase; letter-spacing:.6px;
+    background:rgba(255,255,255,.16); padding:3px 8px; border-radius:999px; }
+  .back { background:rgba(255,255,255,.14); color:#fff; border:0; cursor:pointer;
+    width:34px; height:34px; border-radius:9px; font-size:18px; line-height:1; }
+  .hidden { display:none !important; }
+
+  .view { max-width:1040px; margin:0 auto; padding:16px 14px 30px; }
+  h1.page { font-size:22px; margin:6px 3px 2px; text-wrap:balance; }
+  .sub { color:var(--muted); margin:0 3px 10px; font-size:13.5px; }
+  .section-title { font-size:12px; text-transform:uppercase; letter-spacing:.7px;
+    color:var(--muted); margin:22px 3px 10px; font-weight:700; }
+  .empty { text-align:center; color:var(--muted); padding:38px 10px; }
+  .loading { color:var(--muted); padding:40px 0; text-align:center; }
+
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:4px; }
+  .stat { background:var(--card); border-radius:var(--radius); padding:13px 14px;
+    box-shadow:var(--shadow); border:1px solid var(--line); }
+  .stat .n { font-size:25px; font-weight:750; line-height:1; }
+  .stat .l { font-size:11.5px; color:var(--muted); margin-top:5px; }
+  .stat.red .n{color:var(--red);} .stat.amber .n{color:var(--amber);}
+  .stat.green .n{color:var(--green);} .stat.navy .n{color:var(--navy);}
+
+  .btn-row { display:flex; gap:8px; flex-wrap:wrap; margin:12px 3px 0; }
+  .btn { font:inherit; border:1px solid var(--line); background:#fff; color:var(--ink);
+    border-radius:9px; padding:9px 13px; cursor:pointer; font-size:13.5px; font-weight:600;
+    min-height:40px; display:inline-flex; align-items:center; gap:6px; text-decoration:none; }
+  .btn:hover { border-color:#c6cfda; }
+  .btn:focus-visible { outline:2px solid #bcd3ee; outline-offset:1px; }
+  .btn.primary { background:var(--navy); border-color:var(--navy); color:#fff; }
+  .btn.primary:hover { background:var(--navy-2); }
+  .btn.small { padding:7px 11px; font-size:12.5px; min-height:34px; }
+
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(255px,1fr)); gap:12px; }
+  .card { background:var(--card); border-radius:var(--radius); padding:16px;
+    box-shadow:var(--shadow); border:1px solid var(--line); cursor:pointer;
+    transition:transform .08s ease,box-shadow .12s ease; }
+  .card:active { transform:scale(.995); }
+  .card:hover { box-shadow:0 6px 20px rgba(16,33,54,.12); }
+  .card .row { display:flex; align-items:center; justify-content:space-between; }
+  .card .tail { font-size:19px; font-weight:750; }
+  .card .mm { color:var(--muted); font-size:13px; margin-top:1px; }
+  .card .meta { display:flex; gap:14px; margin-top:12px; font-size:13px; color:var(--muted); }
+  .card .meta b { color:var(--ink); }
+  .card .next { margin-top:9px; font-size:12.5px; color:var(--muted); }
+
+  .light { width:14px; height:14px; border-radius:50%; flex:none; box-shadow:0 0 0 3px rgba(0,0,0,.04); }
+  .light.green{background:var(--green);} .light.amber{background:var(--amber);}
+  .light.red{background:var(--red);} .light.grey{background:var(--grey);}
+
+  .chip { display:inline-flex; align-items:center; font-size:12px; font-weight:650;
+    padding:3px 9px; border-radius:999px; white-space:nowrap; }
+  .chip.ok{background:var(--green-bg);color:var(--green);}
+  .chip.due_soon{background:var(--amber-bg);color:var(--amber);}
+  .chip.overdue{background:var(--red-bg);color:var(--red);}
+  .chip.unknown{background:#eef1f4;color:var(--grey);}
+  .chip.aw{background:var(--navy);color:#fff;font-size:9.5px;padding:2px 6px;letter-spacing:.3px;}
+
+  .alert { display:flex; align-items:center; gap:12px; background:var(--card);
+    border:1px solid var(--line); border-left:4px solid var(--grey); border-radius:11px;
+    padding:11px 13px; margin-bottom:8px; cursor:pointer; box-shadow:var(--shadow); }
+  .alert.overdue{border-left-color:var(--red);} .alert.due_soon{border-left-color:var(--amber);}
+  .alert .a-main{flex:1; min-width:0;}
+  .alert .a-name{font-weight:650;}
+  .alert .a-sub{font-size:12.5px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .alert .a-tail{font-weight:700;font-size:13px;}
+
+  .comp-strip { display:flex; gap:10px; flex-wrap:wrap; margin:4px 0 6px; }
+  .comp { background:var(--card); border:1px solid var(--line); border-radius:11px;
+    padding:11px 13px; box-shadow:var(--shadow); min-width:148px; }
+  .comp .c-pos{font-weight:650;font-size:14px;}
+  .comp .c-h{color:var(--muted);font-size:12.5px;margin-top:2px;}
+  .comp .btn{margin-top:9px;}
+
+  .cat-group{margin-bottom:16px;}
+  .cat-head{font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700;margin:0 2px 8px;}
+  .item{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--line);
+    border-radius:11px;padding:12px 13px;margin-bottom:8px;box-shadow:var(--shadow);}
+  .item .i-main{flex:1;min-width:0;}
+  .item .i-name{font-weight:650;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .item .i-sub{font-size:12.5px;color:var(--muted);margin-top:3px;}
+  .item .i-actions{display:flex;gap:6px;}
+  .reg{font-size:11px;color:var(--muted);font-family:ui-monospace,monospace;}
+
+  .overlay{position:fixed;inset:0;background:rgba(13,25,40,.45);display:flex;
+    align-items:flex-end;justify-content:center;z-index:50;}
+  .modal{background:#fff;width:100%;max-width:460px;border-radius:16px 16px 0 0;padding:20px;
+    box-shadow:0 -8px 40px rgba(0,0,0,.25);max-height:92vh;overflow:auto;}
+  .modal h3{margin:0 0 4px;text-wrap:balance;} .modal .m-sub{color:var(--muted);font-size:13px;margin-bottom:14px;}
+  .field{margin-bottom:12px;} .field label{display:block;font-size:12.5px;font-weight:650;color:var(--muted);margin-bottom:5px;}
+  .field input,.field select,.field textarea{width:100%;font:inherit;font-size:16px;padding:10px 12px;
+    border:1px solid var(--line);border-radius:10px;background:#fbfcfe;}
+  .field input:focus,.field textarea:focus,.field select:focus{outline:2px solid #bcd3ee;border-color:#bcd3ee;}
+  .modal .actions{display:flex;gap:9px;margin-top:16px;} .modal .actions .btn{flex:1;justify-content:center;padding:12px;}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .hist{border:1px solid var(--line);border-radius:11px;padding:12px 13px;margin-bottom:9px;}
+  .hist .h-head{font-size:14px;} .hist .h-meta{font-size:12.5px;color:var(--muted);margin-top:3px;}
+
+  .foot{max-width:1040px;margin:0 auto;padding:6px 16px 26px;color:var(--muted);font-size:11.5px;line-height:1.5;}
+
+  @media (min-width:560px){ .overlay{align-items:center;} .modal{border-radius:16px;} }
+  @media (max-width:520px){ .stats{grid-template-columns:repeat(2,1fr);} }
+  @media (prefers-reduced-motion:reduce){ *{transition:none !important;} }
+</style>
+
+<header class="topbar">
+  <button id="backBtn" class="back hidden" aria-label="Back">&#8592;</button>
+  <div class="brand" id="homeLink"><span class="logo">&#9992;</span><span>SBSF Maintenance Hub</span></div>
+  <div class="spacer"></div>
+  <span class="advisory" title="Intervals are advisory defaults; verify with maintenance personnel.">advisory</span>
+</header>
+<main id="view" class="view"><div class="loading">Loading&hellip;</div></main>
+<div id="modalRoot"></div>
+<footer class="foot">
+  Advisory tool only &mdash; the signed aircraft records remain authoritative. Verify all intervals
+  against the specific aircraft, ADs and current regulations. Changes you make are saved on this device only.
+</footer>
+
+<script>
+"use strict";
+// ---- seed data (baked in) ----
+const SEED = /*__FLEET__*/[{"id":4,"tail_number":"N118HU","make":"Bell","model":"UH-1H Iroquois (Huey)","serial_number":"66-16718","year":1966,"home_base":"KPIT","notes":"Turbine helicopter; Lycoming T53. Tracks rotor & drivetrain time-life components by hours and cycles.","components":[{"id":12,"type":"airframe","position":"Airframe","current_hours":3760.0,"current_cycles":5264,"hours_rate_per_day":0.59167,"cycles_rate_per_day":0.83333},{"id":13,"type":"engine","position":"Engine","current_hours":640.0,"current_cycles":640,"hours_rate_per_day":0.59167,"cycles_rate_per_day":0.59167},{"id":14,"type":"main_rotor","position":"Main rotor","current_hours":1980.0,"current_cycles":7920,"hours_rate_per_day":0.59167,"cycles_rate_per_day":2.36667},{"id":15,"type":"tail_rotor","position":"Tail rotor","current_hours":1980.0,"current_cycles":7920,"hours_rate_per_day":0.59167,"cycles_rate_per_day":2.36667},{"id":16,"type":"transmission","position":"Main transmission","current_hours":1980.0,"current_cycles":1980,"hours_rate_per_day":0.59167,"cycles_rate_per_day":0.59167},{"id":17,"type":"gearbox","position":"42\u00b0 gearbox","current_hours":1980.0,"current_cycles":1980,"hours_rate_per_day":0.59167,"cycles_rate_per_day":0.59167},{"id":18,"type":"gearbox","position":"90\u00b0 gearbox","current_hours":1980.0,"current_cycles":1980,"hours_rate_per_day":0.59167,"cycles_rate_per_day":0.59167}],"items":[{"id":56,"component_id":12,"name":"Annual inspection","category":"inspection","reg_reference":"91.409(a)","interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2026-04-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":57,"component_id":12,"name":"Transponder check","category":"avionics","reg_reference":"91.413","interval_kind":"calendar","interval_months":24,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2024-07-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":58,"component_id":12,"name":"Altimeter / pitot-static system check","category":"avionics","reg_reference":"91.411","interval_kind":"calendar","interval_months":24,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2024-05-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":59,"component_id":12,"name":"ELT inspection","category":"emergency_equipment","reg_reference":"91.207(d)","interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2025-07-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":60,"component_id":12,"name":"ELT battery replacement","category":"emergency_equipment","reg_reference":"91.207(c)","interval_kind":"fixed","interval_months":null,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":"2027-10-21","warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":61,"component_id":12,"name":"Aircraft registration","category":"registration","reg_reference":"14 CFR 47","interval_kind":"fixed","interval_months":null,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":"2029-03-24","warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":62,"component_id":12,"name":"Fire extinguisher inspection","category":"emergency_equipment","reg_reference":null,"interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2025-12-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":63,"component_id":12,"name":"First aid / medical kit","category":"emergency_equipment","reg_reference":null,"interval_kind":"fixed","interval_months":null,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":"2026-07-20","warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":64,"component_id":12,"name":"Hydraulic system inspection","category":"airframe","reg_reference":null,"interval_kind":"hours","interval_months":null,"interval_hours":300.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":3480.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":65,"component_id":13,"name":"Oil & filter change","category":"engine","reg_reference":null,"interval_kind":"combo_first","interval_months":4,"interval_hours":50.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2026-04-28","last_done_hours":604.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":66,"component_id":13,"name":"Hot section inspection","category":"engine","reg_reference":null,"interval_kind":"hours","interval_months":null,"interval_hours":1000.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":90,"warning_hours":null,"last_done_date":null,"last_done_hours":-280.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":67,"component_id":13,"name":"Engine overhaul (TBO)","category":"engine","reg_reference":null,"interval_kind":"combo_first","interval_months":144,"interval_hours":2000.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":180,"warning_hours":null,"last_done_date":"2023-02-28","last_done_hours":-1140.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":68,"component_id":14,"name":"Main rotor blade retirement","category":"rotor","reg_reference":null,"interval_kind":"combo_first","interval_months":null,"interval_hours":2500.0,"interval_cycles":11000,"fixed_expiry_date":null,"warning_days":180,"warning_hours":null,"last_done_date":null,"last_done_hours":-390.0,"last_done_cycles":-2480,"is_required_for_airworthiness":true},{"id":69,"component_id":14,"name":"Main rotor hub & grip inspection","category":"rotor","reg_reference":null,"interval_kind":"hours","interval_months":null,"interval_hours":600.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":1425.0,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":70,"component_id":15,"name":"Tail rotor blade retirement","category":"rotor","reg_reference":null,"interval_kind":"hours","interval_months":null,"interval_hours":2500.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":120,"warning_hours":null,"last_done_date":null,"last_done_hours":-220.0,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":71,"component_id":16,"name":"Main transmission overhaul","category":"transmission","reg_reference":null,"interval_kind":"hours","interval_months":null,"interval_hours":2500.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":180,"warning_hours":null,"last_done_date":null,"last_done_hours":-350.0,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":72,"component_id":17,"name":"42\u00b0 / intermediate gearbox overhaul","category":"transmission","reg_reference":null,"interval_kind":"hours","interval_months":null,"interval_hours":2500.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":120,"warning_hours":null,"last_done_date":null,"last_done_hours":-120.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":73,"component_id":18,"name":"90\u00b0 / tail rotor gearbox overhaul","category":"transmission","reg_reference":null,"interval_kind":"hours","interval_months":null,"interval_hours":2500.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":120,"warning_hours":null,"last_done_date":null,"last_done_hours":-170.0,"last_done_cycles":null,"is_required_for_airworthiness":false}]},{"id":1,"tail_number":"N314PB","make":"Consolidated","model":"PBY-5A Catalina","serial_number":"CV-417","year":1943,"home_base":"KAGC","notes":"Amphibious flying boat; twin Pratt & Whitney R-1830 Twin Wasp.","components":[{"id":1,"type":"airframe","position":"Airframe","current_hours":4180.0,"current_cycles":3762,"hours_rate_per_day":0.59167,"cycles_rate_per_day":0.53333},{"id":2,"type":"engine","position":"Engine #1","current_hours":5210.0,"current_cycles":5210,"hours_rate_per_day":0.59167,"cycles_rate_per_day":0.59167},{"id":3,"type":"engine","position":"Engine #2","current_hours":5185.0,"current_cycles":5185,"hours_rate_per_day":0.59167,"cycles_rate_per_day":0.59167},{"id":4,"type":"propeller","position":"Propeller #1","current_hours":5210.0,"current_cycles":5210,"hours_rate_per_day":0.59167,"cycles_rate_per_day":0.59167},{"id":5,"type":"propeller","position":"Propeller #2","current_hours":5185.0,"current_cycles":5185,"hours_rate_per_day":0.59167,"cycles_rate_per_day":0.59167}],"items":[{"id":1,"component_id":1,"name":"Annual inspection","category":"inspection","reg_reference":"91.409(a)","interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2026-04-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":2,"component_id":1,"name":"Transponder check","category":"avionics","reg_reference":"91.413","interval_kind":"calendar","interval_months":24,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2024-07-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":3,"component_id":1,"name":"Altimeter / pitot-static system check","category":"avionics","reg_reference":"91.411","interval_kind":"calendar","interval_months":24,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2024-05-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":4,"component_id":1,"name":"ELT inspection","category":"emergency_equipment","reg_reference":"91.207(d)","interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2025-07-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":5,"component_id":1,"name":"ELT battery replacement","category":"emergency_equipment","reg_reference":"91.207(c)","interval_kind":"fixed","interval_months":null,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":"2027-10-21","warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":6,"component_id":1,"name":"Aircraft registration","category":"registration","reg_reference":"14 CFR 47","interval_kind":"fixed","interval_months":null,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":"2029-03-24","warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":7,"component_id":1,"name":"Fire extinguisher inspection","category":"emergency_equipment","reg_reference":null,"interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2025-12-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":8,"component_id":1,"name":"First aid / medical kit","category":"emergency_equipment","reg_reference":null,"interval_kind":"fixed","interval_months":null,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":"2026-07-20","warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":9,"component_id":1,"name":"Hull / float inspection","category":"airframe","reg_reference":null,"interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2025-05-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":10,"component_id":1,"name":"Landing gear retraction inspection","category":"airframe","reg_reference":null,"interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2026-04-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":11,"component_id":1,"name":"Life raft repack / recertification","category":"emergency_equipment","reg_reference":null,"interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2025-08-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":12,"component_id":1,"name":"Life vests inspection","category":"emergency_equipment","reg_reference":null,"interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2025-11-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":13,"component_id":1,"name":"Flares / pyrotechnic signals","category":"emergency_equipment","reg_reference":null,"interval_kind":"fixed","interval_months":null,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":"2026-06-22","warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":14,"component_id":2,"name":"Oil & filter change","category":"engine","reg_reference":null,"interval_kind":"combo_first","interval_months":4,"interval_hours":50.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2026-03-28","last_done_hours":5169.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":15,"component_id":2,"name":"Cylinder compression check","category":"engine","reg_reference":null,"interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2025-07-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":16,"component_id":2,"name":"Magneto inspection","category":"engine","reg_reference":null,"interval_kind":"hours","interval_months":null,"interval_hours":500.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":4770.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":17,"component_id":2,"name":"Engine top overhaul","category":"engine","reg_reference":null,"interval_kind":"hours","interval_months":null,"interval_hours":800.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":120,"warning_hours":null,"last_done_date":null,"last_done_hours":4500.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":18,"component_id":2,"name":"Engine overhaul (TBO)","category":"engine","reg_reference":null,"interval_kind":"combo_first","interval_months":144,"interval_hours":2000.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":180,"warning_hours":null,"last_done_date":"2018-12-28","last_done_hours":3390.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":19,"component_id":4,"name":"Propeller overhaul","category":"propeller","reg_reference":null,"interval_kind":"combo_first","interval_months":72,"interval_hours":2000.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":180,"warning_hours":null,"last_done_date":"2023-02-28","last_done_hours":3470.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":20,"component_id":3,"name":"Oil & filter change","category":"engine","reg_reference":null,"interval_kind":"combo_first","interval_months":4,"interval_hours":50.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2026-03-28","last_done_hours":5144.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":21,"component_id":3,"name":"Cylinder compression check","category":"engine","reg_reference":null,"interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2025-07-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":22,"component_id":3,"name":"Magneto inspection","category":"engine","reg_reference":null,"interval_kind":"hours","interval_months":null,"interval_hours":500.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":4745.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":23,"component_id":3,"name":"Engine top overhaul","category":"engine","reg_reference":null,"interval_kind":"hours","interval_months":null,"interval_hours":800.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":120,"warning_hours":null,"last_done_date":null,"last_done_hours":4475.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":24,"component_id":3,"name":"Engine overhaul (TBO)","category":"engine","reg_reference":null,"interval_kind":"combo_first","interval_months":144,"interval_hours":2000.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":180,"warning_hours":null,"last_done_date":"2018-12-28","last_done_hours":3365.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":25,"component_id":5,"name":"Propeller overhaul","category":"propeller","reg_reference":null,"interval_kind":"combo_first","interval_months":72,"interval_hours":2000.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":180,"warning_hours":null,"last_done_date":"2023-02-28","last_done_hours":3445.0,"last_done_cycles":null,"is_required_for_airworthiness":false}]},{"id":3,"tail_number":"N4DN","make":"Douglas","model":"AD-4N Skyraider","serial_number":"7722","year":1951,"home_base":"KBVI","notes":"Single Wright R-3350 radial.","components":[{"id":9,"type":"airframe","position":"Airframe","current_hours":2580.0,"current_cycles":2580,"hours_rate_per_day":0.59167,"cycles_rate_per_day":0.59167},{"id":10,"type":"engine","position":"Engine","current_hours":310.0,"current_cycles":310,"hours_rate_per_day":0.59167,"cycles_rate_per_day":0.59167},{"id":11,"type":"propeller","position":"Propeller","current_hours":310.0,"current_cycles":310,"hours_rate_per_day":0.59167,"cycles_rate_per_day":0.59167}],"items":[{"id":41,"component_id":9,"name":"Annual inspection","category":"inspection","reg_reference":"91.409(a)","interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2025-07-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":42,"component_id":9,"name":"Transponder check","category":"avionics","reg_reference":"91.413","interval_kind":"calendar","interval_months":24,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2026-04-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":43,"component_id":9,"name":"Altimeter / pitot-static system check","category":"avionics","reg_reference":"91.411","interval_kind":"calendar","interval_months":24,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2026-04-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":44,"component_id":9,"name":"ELT inspection","category":"emergency_equipment","reg_reference":"91.207(d)","interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2026-05-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":45,"component_id":9,"name":"ELT battery replacement","category":"emergency_equipment","reg_reference":"91.207(c)","interval_kind":"fixed","interval_months":null,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":"2026-07-10","warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":46,"component_id":9,"name":"Aircraft registration","category":"registration","reg_reference":"14 CFR 47","interval_kind":"fixed","interval_months":null,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":"2030-01-18","warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":47,"component_id":9,"name":"Fire extinguisher inspection","category":"emergency_equipment","reg_reference":null,"interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2025-05-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":48,"component_id":9,"name":"First aid / medical kit","category":"emergency_equipment","reg_reference":null,"interval_kind":"fixed","interval_months":null,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":"2027-01-14","warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":49,"component_id":9,"name":"Flares / pyrotechnic signals","category":"emergency_equipment","reg_reference":null,"interval_kind":"fixed","interval_months":null,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":"2026-06-25","warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":50,"component_id":10,"name":"Oil & filter change","category":"engine","reg_reference":null,"interval_kind":"combo_first","interval_months":4,"interval_hours":50.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2026-03-28","last_done_hours":263.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":51,"component_id":10,"name":"Cylinder compression check","category":"engine","reg_reference":null,"interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2026-04-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":52,"component_id":10,"name":"Magneto inspection","category":"engine","reg_reference":null,"interval_kind":"hours","interval_months":null,"interval_hours":500.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":-172.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":53,"component_id":10,"name":"Engine top overhaul","category":"engine","reg_reference":null,"interval_kind":"hours","interval_months":null,"interval_hours":800.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":120,"warning_hours":null,"last_done_date":null,"last_done_hours":-70.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":54,"component_id":10,"name":"Engine overhaul (TBO)","category":"engine","reg_reference":null,"interval_kind":"combo_first","interval_months":144,"interval_hours":2000.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":180,"warning_hours":null,"last_done_date":"2024-10-28","last_done_hours":-1090.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":55,"component_id":11,"name":"Propeller overhaul","category":"propeller","reg_reference":null,"interval_kind":"combo_first","interval_months":72,"interval_hours":2000.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":180,"warning_hours":null,"last_done_date":"2024-10-28","last_done_hours":-790.0,"last_done_cycles":null,"is_required_for_airworthiness":false}]},{"id":2,"tail_number":"NX340P","make":"Curtiss","model":"P-40N-1 Warhawk","serial_number":"28954","year":1943,"home_base":"KAGC","notes":"Single Allison V-1710 liquid-cooled inline.","components":[{"id":6,"type":"airframe","position":"Airframe","current_hours":3120.0,"current_cycles":3432,"hours_rate_per_day":0.59167,"cycles_rate_per_day":0.65833},{"id":7,"type":"engine","position":"Engine","current_hours":470.0,"current_cycles":470,"hours_rate_per_day":0.59167,"cycles_rate_per_day":0.59167},{"id":8,"type":"propeller","position":"Propeller","current_hours":470.0,"current_cycles":470,"hours_rate_per_day":0.59167,"cycles_rate_per_day":0.59167}],"items":[{"id":26,"component_id":6,"name":"Annual inspection","category":"inspection","reg_reference":"91.409(a)","interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2026-04-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":27,"component_id":6,"name":"Transponder check","category":"avionics","reg_reference":"91.413","interval_kind":"calendar","interval_months":24,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2024-07-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":28,"component_id":6,"name":"Altimeter / pitot-static system check","category":"avionics","reg_reference":"91.411","interval_kind":"calendar","interval_months":24,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2024-05-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":29,"component_id":6,"name":"ELT inspection","category":"emergency_equipment","reg_reference":"91.207(d)","interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2025-07-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":30,"component_id":6,"name":"ELT battery replacement","category":"emergency_equipment","reg_reference":"91.207(c)","interval_kind":"fixed","interval_months":null,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":"2027-10-21","warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":31,"component_id":6,"name":"Aircraft registration","category":"registration","reg_reference":"14 CFR 47","interval_kind":"fixed","interval_months":null,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":"2029-03-24","warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":true},{"id":32,"component_id":6,"name":"Fire extinguisher inspection","category":"emergency_equipment","reg_reference":null,"interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2025-12-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":33,"component_id":6,"name":"First aid / medical kit","category":"emergency_equipment","reg_reference":null,"interval_kind":"fixed","interval_months":null,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":"2026-07-20","warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":34,"component_id":6,"name":"Life vests inspection","category":"emergency_equipment","reg_reference":null,"interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2026-02-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":35,"component_id":7,"name":"Oil & filter change","category":"engine","reg_reference":null,"interval_kind":"combo_first","interval_months":4,"interval_hours":50.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2026-03-28","last_done_hours":426.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":36,"component_id":7,"name":"Coolant system inspection","category":"engine","reg_reference":null,"interval_kind":"calendar","interval_months":12,"interval_hours":null,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":"2025-05-28","last_done_hours":null,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":37,"component_id":7,"name":"Magneto inspection","category":"engine","reg_reference":null,"interval_kind":"hours","interval_months":null,"interval_hours":500.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":100.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":38,"component_id":7,"name":"Spark plug service","category":"engine","reg_reference":null,"interval_kind":"hours","interval_months":null,"interval_hours":100.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":30,"warning_hours":null,"last_done_date":null,"last_done_hours":415.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":39,"component_id":7,"name":"Engine overhaul (TBO)","category":"engine","reg_reference":null,"interval_kind":"combo_first","interval_months":144,"interval_hours":2000.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":180,"warning_hours":null,"last_done_date":"2023-12-28","last_done_hours":-1200.0,"last_done_cycles":null,"is_required_for_airworthiness":false},{"id":40,"component_id":8,"name":"Propeller overhaul","category":"propeller","reg_reference":null,"interval_kind":"combo_first","interval_months":72,"interval_hours":2000.0,"interval_cycles":null,"fixed_expiry_date":null,"warning_days":180,"warning_hours":null,"last_done_date":"2023-12-28","last_done_hours":-1110.0,"last_done_cycles":null,"is_required_for_airworthiness":false}]}];
+const STORE_KEY = "sbsf_hub_v1";
+
+function load() {
+  try { const s = localStorage.getItem(STORE_KEY); if (s) return JSON.parse(s); } catch (e) {}
+  return JSON.parse(JSON.stringify(SEED));
+}
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(DATA)); } catch (e) {} }
+let DATA = load();
+const acById = (id) => DATA.find(a => a.id === id);
+const compById = (ac, id) => ac.components.find(c => c.id === id);
+
+// ---- compliance engine (ported) ----
+const DEFAULT_HOURS_PER_MONTH = 25, DAYS_PER_MONTH = 30.4368;
+const FAR = new Date(9999, 11, 31);
+const SEV = { unknown:0, ok:1, due_soon:2, overdue:3 };
+const worst = (a,b) => SEV[a] >= SEV[b] ? a : b;
+
+function today0(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
+function parseD(s){ const d=new Date(s+"T00:00:00"); d.setHours(0,0,0,0); return d; }
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+Math.round(n)); x.setHours(0,0,0,0); return x; }
+function daysBetween(a,b){ return Math.round((b-a)/86400000); }
+function isoD(d){ const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),da=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${da}`; }
+function minD(cur,d){ return cur==null ? d : (d<cur ? d : cur); }
+function addCalMonths(dStr,months){
+  const d=parseD(dStr); const total=d.getFullYear()*12+d.getMonth()+months;
+  const y=Math.floor(total/12), m=total-y*12; const last=new Date(y,m+1,0).getDate();
+  const r=new Date(y,m,last); r.setHours(0,0,0,0); return r;
+}
+function statusFromDays(rem,warn){ return rem<0 ? "overdue" : (rem<=warn ? "due_soon" : "ok"); }
+
+function compute(it, comp){
+  const today=today0(), k=it.interval_kind, warn=it.warning_days||30;
+  const res={status:"unknown",effective_due_date:null,remaining_days:null,
+    next_due_date:null,next_due_hours:null,next_due_cycles:null,
+    remaining_hours:null,remaining_cycles:null,projected:false,reasons:[]};
+
+  if(k==="fixed"){
+    if(!it.fixed_expiry_date) return res;
+    const due=parseD(it.fixed_expiry_date);
+    res.next_due_date=due; res.effective_due_date=due;
+    res.remaining_days=daysBetween(today,due);
+    res.status=statusFromDays(res.remaining_days,warn);
+    if(res.status!=="ok") res.reasons.push("Expires "+isoD(due));
+    return res;
+  }
+  const useCal=["calendar","combo_first","combo_last"].includes(k)&&it.interval_months!=null;
+  const useHrs=["hours","combo_first","combo_last"].includes(k)&&it.interval_hours!=null;
+  const useCyc=["cycles","combo_first","combo_last"].includes(k)&&it.interval_cycles!=null;
+  const dims=[]; let calDate=null, projDate=null;
+
+  if(useCal){
+    if(it.last_done_date){
+      const due=addCalMonths(it.last_done_date,it.interval_months); res.next_due_date=due; calDate=due;
+      const rem=daysBetween(today,due); const s=statusFromDays(rem,warn);
+      dims.push({s,d:due}); if(s!=="ok") res.reasons.push("Calendar due "+isoD(due)+" ("+rem+"d)");
+    } else dims.push({s:"unknown",d:null});
+  }
+  if(useHrs){
+    if(it.last_done_hours!=null && comp){
+      const dueH=it.last_done_hours+it.interval_hours; res.next_due_hours=dueH;
+      const rem=dueH-comp.current_hours; res.remaining_hours=rem;
+      const rate=(comp.hours_rate_per_day>0)?comp.hours_rate_per_day:(DEFAULT_HOURS_PER_MONTH/DAYS_PER_MONTH);
+      const proj=rem<=0?today:addDays(today,rem/rate); projDate=minD(projDate,proj);
+      let s=statusFromDays(daysBetween(today,proj),warn);
+      if(rem<=0) s="overdue"; else if(it.warning_hours!=null && rem<=it.warning_hours) s=worst(s,"due_soon");
+      dims.push({s,d:proj});
+      if(s!=="ok") res.reasons.push("Hours due at "+fmtNum(dueH)+"h ("+fmtNum(rem)+"h left, ≈"+isoD(proj)+")");
+    } else dims.push({s:"unknown",d:null});
+  }
+  if(useCyc){
+    if(it.last_done_cycles!=null && comp){
+      const dueC=it.last_done_cycles+it.interval_cycles; res.next_due_cycles=dueC;
+      const rem=dueC-comp.current_cycles; res.remaining_cycles=rem;
+      const rate=(comp.cycles_rate_per_day>0)?comp.cycles_rate_per_day:null;
+      let proj=rem<=0?today:(rate?addDays(today,rem/rate):FAR);
+      if(proj!==FAR) projDate=minD(projDate,proj);
+      let s; if(rem<=0) s="overdue"; else if(proj!==FAR) s=statusFromDays(daysBetween(today,proj),warn); else s="ok";
+      dims.push({s,d:proj});
+      if(s!=="ok") res.reasons.push("Cycles due at "+dueC+" ("+rem+" left)");
+    } else dims.push({s:"unknown",d:null});
+  }
+
+  if(!dims.length) return res;
+  const known=dims.filter(x=>x.s!=="unknown");
+  if(!known.length){ res.status="unknown"; return res; }
+  res.projected = (projDate!=null && calDate==null);
+
+  if(k==="combo_last"){
+    const chosen=known.reduce((a,b)=> ((b.d||FAR)>(a.d||FAR)?b:a));
+    res.status=chosen.s; res.effective_due_date=(chosen.d&&chosen.d!==FAR)?chosen.d:null;
+  } else {
+    res.status=known.map(x=>x.s).reduce(worst);
+    const dated=known.filter(x=>x.d&&x.d!==FAR);
+    res.effective_due_date = dated.length? dated.reduce((a,b)=>(b.d<a.d?b:a)).d : null;
+  }
+  if(res.effective_due_date) res.remaining_days=daysBetween(today,res.effective_due_date);
+  return res;
+}
+
+// ---- helpers ----
+const el=(t,c,h)=>{const n=document.createElement(t); if(c)n.className=c; if(h!=null)n.innerHTML=h; return n;};
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtNum=n=>{ const r=Math.round(n*10)/10; return (r%1===0?r.toFixed(0):r.toString()); };
+const STATUS_LABEL={ok:"OK",due_soon:"Due soon",overdue:"Overdue",unknown:"No data"};
+const CAT_LABEL={inspection:"Inspections",emergency_equipment:"Emergency equipment",engine:"Engine",
+  propeller:"Propeller",rotor:"Rotor system",transmission:"Transmission & gearboxes",airframe:"Airframe",
+  avionics:"Avionics",registration:"Registration",ad:"Airworthiness Directives",other:"Other"};
+const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const SEVN={overdue:3,due_soon:2,ok:1,unknown:0};
+const lightFor=s=>s==="overdue"?"red":s==="due_soon"?"amber":s==="ok"?"green":"grey";
+function fmtDate(d){ if(!d)return "—"; const x=(d instanceof Date)?d:parseD(d);
+  return x.toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"}); }
+function daysText(n){ if(n==null)return ""; if(n<0)return (-n)+(n===-1?" day":" days")+" overdue";
+  if(n===0)return "due today"; return "in "+n+(n===1?" day":" days"); }
+const statusChip=s=>`<span class="chip ${s}">${STATUS_LABEL[s]||s}</span>`;
+
+const view=document.getElementById("view"), modalRoot=document.getElementById("modalRoot"), backBtn=document.getElementById("backBtn");
+const go=h=>location.hash=h;
+document.getElementById("homeLink").onclick=()=>go("#/");
+backBtn.onclick=()=>go("#/");
+window.addEventListener("hashchange",route);
+window.addEventListener("load",route);
+
+function route(){
+  const h=location.hash||"#/"; const m=h.match(/^#\/aircraft\/(\d+)/);
+  if(m){ backBtn.classList.remove("hidden"); renderAircraft(+m[1]); }
+  else if(h.startsWith("#/calendar")){ backBtn.classList.remove("hidden"); renderCalendar(); }
+  else { backBtn.classList.add("hidden"); renderDashboard(); }
+}
+
+// ---- aircraft rollup ----
+function summarize(ac){
+  let overdue=0,due_soon=0,aw=0,soonest=null;
+  ac.items.forEach(it=>{ const r=compute(it,compById(ac,it.component_id));
+    if(r.status==="overdue"){overdue++; if(it.is_required_for_airworthiness)aw++;}
+    else if(r.status==="due_soon")due_soon++;
+    if(r.effective_due_date && (soonest==null||r.effective_due_date<soonest.d)) soonest={d:r.effective_due_date,name:it.name};
+  });
+  const light=(aw||overdue)?"red":(due_soon?"amber":"green");
+  return {overdue,due_soon,aw,light,soonest};
+}
+
+// ---- dashboard ----
+function renderDashboard(){
+  view.innerHTML="";
+  view.appendChild(el("h1","page","Fleet status"));
+  const totalItems=DATA.reduce((n,a)=>n+a.items.length,0);
+  view.appendChild(el("p","sub",`${DATA.length} aircraft · ${totalItems} tracked items`));
+
+  let O=0,D=0,K=0,A=0; const alerts=[];
+  DATA.forEach(ac=>ac.items.forEach(it=>{ const r=compute(it,compById(ac,it.component_id));
+    if(r.status==="overdue"){O++; if(it.is_required_for_airworthiness)A++;}
+    else if(r.status==="due_soon")D++; else if(r.status==="ok")K++;
+    if(r.status==="overdue"||r.status==="due_soon")
+      alerts.push({ac,it,r});
+  }));
+  const stats=el("div","stats");
+  stats.appendChild(stat("red",O,"Overdue"));
+  stats.appendChild(stat("amber",D,"Due soon"));
+  stats.appendChild(stat("green",K,"Current"));
+  stats.appendChild(stat("navy",A,"Airworthiness overdue"));
+  view.appendChild(stats);
+
+  const btns=el("div","btn-row");
+  const cal=el("button","btn","📅 Timeline"); cal.onclick=()=>go("#/calendar");
+  const rst=el("button","btn","↺ Reset demo data"); rst.onclick=resetData;
+  btns.appendChild(cal); btns.appendChild(rst); view.appendChild(btns);
+
+  view.appendChild(el("div","section-title","Aircraft"));
+  const grid=el("div","grid");
+  DATA.slice().sort((a,b)=>a.tail_number.localeCompare(b.tail_number)).forEach(ac=>grid.appendChild(aircraftCard(ac)));
+  view.appendChild(grid);
+
+  view.appendChild(el("div","section-title",`Attention needed (${alerts.length})`));
+  if(!alerts.length){ view.appendChild(el("div","empty","Nothing due soon or overdue. 🎉")); }
+  else {
+    alerts.sort((a,b)=>{ const sa=a.r.status==="overdue"?0:1, sb=b.r.status==="overdue"?0:1;
+      if(sa!==sb)return sa-sb; const aa=a.it.is_required_for_airworthiness?0:1, ab=b.it.is_required_for_airworthiness?0:1;
+      if(aa!==ab)return aa-ab; return (a.r.remaining_days??9e9)-(b.r.remaining_days??9e9); });
+    alerts.forEach(a=>view.appendChild(alertRow(a.ac,a.it,a.r)));
+  }
+}
+function stat(cls,n,label){ const s=el("div","stat "+cls); s.appendChild(el("div","n tnum",String(n))); s.appendChild(el("div","l",label)); return s; }
+function aircraftCard(ac){
+  const s=summarize(ac); const c=el("div","card"); c.onclick=()=>go("#/aircraft/"+ac.id);
+  const row=el("div","row"); const left=el("div");
+  left.appendChild(el("div","tail",esc(ac.tail_number)));
+  left.appendChild(el("div","mm",esc([ac.make,ac.model].filter(Boolean).join(" "))||"—"));
+  row.appendChild(left); row.appendChild(el("span","light "+s.light)); c.appendChild(row);
+  const meta=el("div","meta");
+  meta.innerHTML=`<span><b class="tnum">${s.overdue}</b> overdue</span><span><b class="tnum">${s.due_soon}</b> due soon</span>`+
+    (ac.home_base?`<span>${esc(ac.home_base)}</span>`:"");
+  c.appendChild(meta);
+  if(s.soonest) c.appendChild(el("div","next",`Next: ${esc(s.soonest.name)} — ${fmtDate(s.soonest.d)}`));
+  return c;
+}
+function alertRow(ac,it,r){
+  const row=el("div","alert "+r.status); const main=el("div","a-main");
+  const aw=it.is_required_for_airworthiness?' <span class="chip aw">AIRWORTHINESS</span>':"";
+  main.appendChild(el("div","a-name",esc(it.name)+aw));
+  main.appendChild(el("div","a-sub",`<span class="a-tail">${esc(ac.tail_number)}</span> · ${esc((r.reasons||[]).join(" · "))}`));
+  row.appendChild(el("span","light "+(r.status==="overdue"?"red":"amber")));
+  row.appendChild(main); row.appendChild(el("div","",statusChip(r.status)));
+  row.onclick=()=>go("#/aircraft/"+ac.id); return row;
+}
+
+// ---- aircraft detail ----
+let CUR=null;
+function renderAircraft(id){
+  const ac=acById(id); if(!ac){ view.innerHTML='<div class="empty">Aircraft not found.</div>'; return; }
+  CUR=ac; view.innerHTML="";
+  view.appendChild(el("h1","page",esc(ac.tail_number)));
+  view.appendChild(el("p","sub",esc([ac.make,ac.model,ac.year].filter(Boolean).join(" "))+(ac.home_base?` · ${esc(ac.home_base)}`:"")));
+  if(ac.notes) view.appendChild(el("p","sub",esc(ac.notes)));
+
+  view.appendChild(el("div","section-title","Components"));
+  const strip=el("div","comp-strip");
+  ac.components.forEach(c=>{ const box=el("div","comp");
+    box.appendChild(el("div","c-pos",esc(c.position||c.type)));
+    box.appendChild(el("div","c-h tnum",`${c.current_hours.toLocaleString()} h · ${c.current_cycles.toLocaleString()} cyc`));
+    const b=el("button","btn small","Update hours"); b.onclick=()=>updateHoursModal(ac,c); box.appendChild(b);
+    strip.appendChild(box); });
+  view.appendChild(strip);
+
+  view.appendChild(el("div","section-title",`Tracked items (${ac.items.length})`));
+  const groups={}; ac.items.forEach(it=>(groups[it.category]=groups[it.category]||[]).push(it));
+  const order=Object.keys(CAT_LABEL).filter(k=>groups[k]);
+  Object.keys(groups).forEach(k=>{ if(!order.includes(k))order.push(k); });
+  order.forEach(cat=>{ const g=el("div","cat-group"); g.appendChild(el("div","cat-head",CAT_LABEL[cat]||cat));
+    groups[cat].map(it=>({it,r:compute(it,compById(ac,it.component_id))}))
+      .sort((a,b)=>SEVN[b.r.status]-SEVN[a.r.status])
+      .forEach(x=>g.appendChild(itemRow(ac,x.it,x.r)));
+    view.appendChild(g); });
+}
+function intervalText(it){ const p=[]; if(it.interval_months)p.push(it.interval_months+" mo");
+  if(it.interval_hours)p.push(it.interval_hours+" h"); if(it.interval_cycles)p.push(it.interval_cycles+" cyc");
+  if(it.interval_kind==="fixed")return "fixed expiry";
+  const j=it.interval_kind==="combo_first"?" or ":it.interval_kind==="combo_last"?" & ":" / "; return p.join(j)||"—"; }
+function itemRow(ac,it,r){
+  const row=el("div","item"); row.appendChild(el("span","light "+lightFor(r.status)));
+  const main=el("div","i-main");
+  const comp=compById(ac,it.component_id);
+  const aw=it.is_required_for_airworthiness?' <span class="chip aw">AIRWORTHINESS</span>':"";
+  const reg=it.reg_reference?` <span class="reg">${esc(it.reg_reference)}</span>`:"";
+  main.appendChild(el("div","i-name",`${esc(it.name)}${reg}${aw}`));
+  let sub=`Every ${intervalText(it)}`;
+  if(comp)sub+=` · ${esc(comp.position)}`;
+  if(r.effective_due_date)sub+=` · ${r.projected?"≈ ":""}due ${fmtDate(r.effective_due_date)} (${daysText(r.remaining_days)})`;
+  else sub+=" · not yet performed";
+  if(r.remaining_hours!=null)sub+=` · ${fmtNum(r.remaining_hours)} h left`;
+  main.appendChild(el("div","i-sub",sub)); row.appendChild(main);
+  row.appendChild(el("div","",statusChip(r.status)));
+  const actions=el("div","i-actions");
+  const hist=el("button","btn small","History"); hist.onclick=()=>historyModal(ac,it);
+  const log=el("button","btn small primary","Log"); log.onclick=()=>logModal(ac,it);
+  actions.appendChild(hist); actions.appendChild(log); row.appendChild(actions); return row;
+}
+
+// ---- timeline ----
+function renderCalendar(){
+  view.innerHTML="";
+  view.appendChild(el("h1","page","Timeline"));
+  view.appendChild(el("p","sub","Every tracked item by due date. Hours-based items show their projected date (≈)."));
+  const entries=[];
+  DATA.forEach(ac=>ac.items.forEach(it=>{ const r=compute(it,compById(ac,it.component_id));
+    if(!r.effective_due_date)return;
+    entries.push({ac,it,r,due:r.effective_due_date}); }));
+  if(!entries.length){ view.appendChild(el("div","empty","Nothing to show.")); return; }
+  entries.sort((a,b)=>a.due-b.due);
+  const groups=new Map();
+  entries.forEach(e=>{ let key,label;
+    if(e.r.remaining_days!=null&&e.r.remaining_days<0){key="0000-00";label="Overdue";}
+    else{const d=e.due; key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; label=`${MONTHS[d.getMonth()]} ${d.getFullYear()}`;}
+    if(!groups.has(key))groups.set(key,{label,items:[]}); groups.get(key).items.push(e); });
+  [...groups.keys()].sort().forEach(key=>{ const g=groups.get(key);
+    view.appendChild(el("div","section-title",`${g.label} (${g.items.length})`));
+    g.items.forEach(e=>{ const r=el("div","alert "+(e.r.status==="overdue"?"overdue":e.r.status==="due_soon"?"due_soon":""));
+      r.appendChild(el("span","light "+lightFor(e.r.status)));
+      const main=el("div","a-main");
+      const aw=e.it.is_required_for_airworthiness?' <span class="chip aw">AW</span>':"";
+      main.appendChild(el("div","a-name",esc(e.it.name)+aw));
+      const comp=compById(e.ac,e.it.component_id);
+      main.appendChild(el("div","a-sub",`<span class="a-tail">${esc(e.ac.tail_number)}</span> · ${e.r.projected?"≈ ":""}${fmtDate(e.due)}`+(comp?` · ${esc(comp.position)}`:"")));
+      r.appendChild(main); r.appendChild(el("div","",statusChip(e.r.status)));
+      r.onclick=()=>go("#/aircraft/"+e.ac.id); view.appendChild(r); }); });
+}
+
+// ---- modals ----
+function openModal(title,sub,bodyNode){
+  const overlay=el("div","overlay"); const modal=el("div","modal");
+  modal.appendChild(el("h3",null,esc(title))); if(sub)modal.appendChild(el("div","m-sub",esc(sub)));
+  modal.appendChild(bodyNode); overlay.appendChild(modal);
+  overlay.onclick=e=>{ if(e.target===overlay)close(); }; modalRoot.appendChild(overlay);
+  function close(){ overlay.remove(); } return {close};
+}
+function field(label,html){ const f=el("div","field"); f.appendChild(el("label",null,label)); f.insertAdjacentHTML("beforeend",html); return f; }
+const todayStr=()=>isoD(today0());
+
+function logModal(ac,it){
+  const comp=compById(ac,it.component_id); const body=el("div"); const form=el("form");
+  form.appendChild(field("Date performed",`<input name="performed_date" type="date" value="${todayStr()}" required>`));
+  if(comp) form.appendChild(field(`Hours at completion (${esc(comp.position)})`,`<input name="hours" type="number" step="0.1" value="${comp.current_hours}">`));
+  form.appendChild(field("Performed by",`<input name="performed_by" placeholder="Name / shop">`));
+  form.appendChild(field("Sign-off (A&P/IA + cert #)",`<input name="signed_off_by" placeholder="e.g. IA 1234567">`));
+  form.appendChild(field("Notes",`<textarea name="notes" rows="2"></textarea>`));
+  const actions=el("div","actions"); const cancel=el("button","btn","Cancel"); cancel.type="button";
+  const sv=el("button","btn primary","Log completion"); sv.type="submit"; actions.appendChild(cancel); actions.appendChild(sv);
+  form.appendChild(actions); body.appendChild(form);
+  const m=openModal(`Log: ${it.name}`,"Advances the next due date.",body); cancel.onclick=m.close;
+  form.onsubmit=e=>{ e.preventDefault(); const fd=Object.fromEntries(new FormData(form).entries());
+    it.last_done_date=fd.performed_date;
+    if(fd.hours){ const h=parseFloat(fd.hours); it.last_done_hours=h;
+      if(comp){ if(h>comp.current_hours)comp.current_hours=h; it.last_done_cycles=comp.current_cycles; } }
+    (it.events=it.events||[]).unshift({performed_date:fd.performed_date,hours:fd.hours?parseFloat(fd.hours):null,
+      performed_by:fd.performed_by||null,signed_off_by:fd.signed_off_by||null,notes:fd.notes||null});
+    save(); m.close(); renderAircraft(ac.id); };
+}
+function updateHoursModal(ac,comp){
+  const body=el("div"); const form=el("form");
+  form.appendChild(field("Current hours",`<input name="hours" type="number" step="0.1" value="${comp.current_hours}" required>`));
+  form.appendChild(field("Current cycles",`<input name="cycles" type="number" value="${comp.current_cycles}">`));
+  const actions=el("div","actions"); const cancel=el("button","btn","Cancel"); cancel.type="button";
+  const sv=el("button","btn primary","Save"); sv.type="submit"; actions.appendChild(cancel); actions.appendChild(sv);
+  form.appendChild(actions); body.appendChild(form);
+  const m=openModal(`Update hours: ${comp.position}`,"Updates projections for this component's hours-based items.",body); cancel.onclick=m.close;
+  form.onsubmit=e=>{ e.preventDefault(); const fd=Object.fromEntries(new FormData(form).entries());
+    comp.current_hours=parseFloat(fd.hours); if(fd.cycles)comp.current_cycles=parseInt(fd.cycles,10);
+    save(); m.close(); renderAircraft(ac.id); };
+}
+function historyModal(ac,it){
+  const body=el("div"); const evs=it.events||[];
+  if(!evs.length) body.appendChild(el("div","empty","No completions logged yet."));
+  else evs.forEach(ev=>{ const card=el("div","hist");
+    card.appendChild(el("div","h-head",`<b>${fmtDate(ev.performed_date)}</b>`+(ev.hours!=null?` · ${ev.hours.toLocaleString()} h`:"")));
+    const meta=[ev.performed_by,ev.signed_off_by].filter(Boolean).join(" · ");
+    if(meta)card.appendChild(el("div","h-meta",esc(meta)));
+    if(ev.notes)card.appendChild(el("div","h-meta",esc(ev.notes)));
+    body.appendChild(card); });
+  openModal(`History: ${it.name}`,"Completions logged on this device.",body);
+}
+
+function resetData(){
+  if(!confirm("Reset to the original demo fleet? This clears changes saved on this device.")) return;
+  DATA=JSON.parse(JSON.stringify(SEED)); save(); route();
+}
+</script>
