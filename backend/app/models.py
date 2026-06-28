@@ -31,6 +31,8 @@ CATEGORIES = [
     "emergency_equipment",
     "engine",
     "propeller",
+    "rotor",
+    "transmission",
     "airframe",
     "avionics",
     "registration",
@@ -38,7 +40,17 @@ CATEGORIES = [
     "other",
 ]
 
-COMPONENT_TYPES = ["airframe", "engine", "propeller", "apu", "other"]
+COMPONENT_TYPES = [
+    "airframe",
+    "engine",
+    "propeller",
+    "main_rotor",
+    "tail_rotor",
+    "transmission",
+    "gearbox",
+    "apu",
+    "other",
+]
 
 
 class Aircraft(Base):
@@ -181,3 +193,24 @@ class ComplianceEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     item: Mapped["ComplianceItem"] = relationship(back_populates="events")
+    attachments: Mapped[list["Attachment"]] = relationship(
+        back_populates="event", cascade="all, delete-orphan"
+    )
+
+
+class Attachment(Base):
+    """A document attached to a completion event (work order, 8130, repack card)."""
+
+    __tablename__ = "attachment"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    compliance_event_id: Mapped[int] = mapped_column(
+        ForeignKey("compliance_event.id", ondelete="CASCADE")
+    )
+    filename: Mapped[str] = mapped_column(String(255))
+    content_type: Mapped[Optional[str]] = mapped_column(String(128))
+    size_bytes: Mapped[Optional[int]] = mapped_column(Integer)
+    storage_path: Mapped[str] = mapped_column(String(512))
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    event: Mapped["ComplianceEvent"] = relationship(back_populates="attachments")

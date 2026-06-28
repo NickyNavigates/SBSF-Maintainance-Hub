@@ -1,6 +1,6 @@
 // Minimal service worker: app-shell cache so the UI loads offline.
 // API responses are always fetched fresh (network-first, no caching).
-const CACHE = "sbsf-hub-v1";
+const CACHE = "sbsf-hub-v2";
 const SHELL = ["/", "/index.html", "/styles.css", "/app.js", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (e) => {

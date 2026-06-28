@@ -12,14 +12,17 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .database import SessionLocal
-from .routers import aircraft, dashboard, items
+from .routers import aircraft, attachments, calendar, dashboard, items, reports
 from .seed import init_db, seed_catalog
 
-app = FastAPI(title="SBSF Maintenance Hub", version="0.1.0")
+app = FastAPI(title="SBSF Maintenance Hub", version="0.2.0")
 
 app.include_router(aircraft.router)
 app.include_router(items.router)
 app.include_router(dashboard.router)
+app.include_router(attachments.router)
+app.include_router(reports.router)
+app.include_router(calendar.router)
 
 
 @app.on_event("startup")

@@ -169,3 +169,14 @@ h1.page { font-size: 22px; margin: 4px 4px 2px; }
 }
 
 .empty { text-align: center; color: var(--muted-2); padding: 40px 10px; }
+
+/* History modal */
+.hist { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+.hist .h-head { font-size: 14px; }
+.hist .h-meta { font-size: 12.5px; color: var(--muted-2); margin-top: 3px; }
+.h-docs { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+.doc-chip { display: inline-flex; align-items: center; font-size: 12.5px; text-decoration: none;
+  color: var(--navy); background: #eef3f9; border: 1px solid #dbe6f1; border-radius: 999px;
+  padding: 4px 11px; cursor: pointer; }
+.doc-chip.add { color: var(--muted-2); background: #fff; border-style: dashed; }
+.doc-chip:hover { background: #e3edf7; }

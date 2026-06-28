@@ -13,19 +13,37 @@ shows what is **due soon** or **overdue** across the fleet.
 
 See [`docs/DESIGN.md`](docs/DESIGN.md) for the full design.
 
-## What's here (MVP)
+## What's here
 
 - **Compliance engine** (`backend/app/engine.py`) — pure, unit-tested logic for
   FAA calendar-month due dates, hours/cycle due points, the
   "whichever-comes-first" combination, and projection of hours-based items onto
   the calendar using each component's measured utilisation rate.
 - **REST API** (FastAPI + SQLAlchemy, SQLite by default) — aircraft, components,
-  hours readings, tracked items, completion events, fleet dashboard, catalog.
+  hours readings, tracked items, completion events, document attachments,
+  fleet dashboard, fleet-wide timeline, catalog, and report export.
 - **Responsive PWA** (`frontend/`, zero build) — fleet dashboard with status
   lights, per-aircraft detail grouped by category, log-completion and
-  update-hours actions, and an in-app attention list.
-- **Seed catalog** — ~20 standard Part 91 item templates and a 4-aircraft demo
-  fleet.
+  update-hours actions, an in-app attention list, a fleet **timeline** view,
+  per-completion **document attachments** with history, and CSV / printable
+  report export.
+- **Seed catalog** — ~34 item templates (Part 91 regulatory, emergency
+  equipment, warbird radial/inline powerplant, amphibian, and helicopter
+  rotor/drivetrain time-life items).
+
+## The SBSF fleet (demo seed)
+
+The `--demo` seed builds the actual SBSF fleet, which exercises the model's
+range — twins, vintage radial and inline engines, an amphibian, and a turbine
+helicopter with rotor/drivetrain time-life components tracked by hours **and**
+cycles:
+
+| Tail | Aircraft | Notable components |
+|------|----------|--------------------|
+| N314PB | Consolidated **PBY-5A Catalina** | Twin R-1830 radials, 2 props, hull/float & gear-retraction |
+| NX340P | Curtiss **P-40N-1 Warhawk** | Allison V-1710 inline (coolant system) |
+| N4DN | Douglas **AD-4N Skyraider** | Wright R-3350 radial |
+| N118HU | Bell **UH-1H Huey** | T53 turbine, main/tail rotor, transmission, 42°/90° gearboxes |
 
 ## Quick start
 
@@ -56,6 +74,8 @@ cd backend && . .venv/bin/activate && python -m pytest
 
 - `DATABASE_URL` — defaults to `sqlite:///./maintenance_hub.db`. Point it at a
   PostgreSQL URL to use Postgres (per the design doc) with no code changes.
+- `UPLOAD_DIR` — where attachment files are stored (defaults to
+  `backend/uploads/`, which is git-ignored).
 
 ## Project layout
 
@@ -69,7 +89,7 @@ backend/
     catalog.py     # seed item-type catalog (Part 91 defaults)
     seed.py        # init DB + seed catalog + demo fleet
     main.py        # FastAPI app
-    routers/       # aircraft, items, dashboard endpoints
+    routers/       # aircraft, items, attachments, reports, calendar, dashboard
   tests/
     test_engine.py
 frontend/          # zero-build responsive PWA (HTML/CSS/vanilla JS)
@@ -79,6 +99,7 @@ docs/
 
 ## Roadmap (next)
 
-Per `docs/DESIGN.md`: notifications (email/SMS) with a nightly recompute job,
-document attachments on completions, a calendar/timeline view, and exportable
-compliance reports. Alerts are currently **in-app only**.
+Per `docs/DESIGN.md`: outbound notifications (email/SMS) with a nightly
+recompute job, per-content tracking inside composite kits (medical/survival),
+authentication/roles, and a recurring-AD import. Alerts are currently
+**in-app only** (dashboard + timeline).

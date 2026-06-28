@@ -32,10 +32,13 @@ const esc = (s) =>
 const STATUS_LABEL = { ok: "OK", due_soon: "Due soon", overdue: "Overdue", unknown: "No data" };
 const CAT_LABEL = {
   inspection: "Inspections", emergency_equipment: "Emergency equipment",
-  engine: "Engine", propeller: "Propeller", airframe: "Airframe",
+  engine: "Engine", propeller: "Propeller", rotor: "Rotor system",
+  transmission: "Transmission & gearboxes", airframe: "Airframe",
   avionics: "Avionics", registration: "Registration", ad: "Airworthiness Directives",
   other: "Other",
 };
+const MONTHS = ["January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"];
 
 function fmtDate(s) {
   if (!s) return "—";
@@ -65,6 +68,7 @@ function route() {
   const h = location.hash || "#/";
   const m = h.match(/^#\/aircraft\/(\d+)/);
   if (m) { backBtn.classList.remove("hidden"); renderAircraft(+m[1]); }
+  else if (h.startsWith("#/calendar")) { backBtn.classList.remove("hidden"); renderCalendar(); }
   else { backBtn.classList.add("hidden"); renderDashboard(); }
 }
 
@@ -93,7 +97,13 @@ async function renderDashboard() {
   const btns = el("div", "btn-row");
   const add = el("button", "btn", "+ Add aircraft");
   add.onclick = addAircraftModal;
+  const cal = el("button", "btn", "📅 Timeline");
+  cal.onclick = () => go("#/calendar");
+  const exp = el("a", "btn", "⤓ Fleet CSV");
+  exp.href = "/api/report.csv";
   btns.appendChild(add);
+  btns.appendChild(cal);
+  btns.appendChild(exp);
   view.appendChild(btns);
 
   // Aircraft cards
@@ -173,6 +183,16 @@ async function renderAircraft(id) {
     esc([ac.make, ac.model, ac.year].filter(Boolean).join(" ")) +
     (ac.home_base ? ` · ${esc(ac.home_base)}` : "")));
 
+  const tools = el("div", "btn-row");
+  const csv = el("a", "btn small", "⤓ Export CSV");
+  csv.href = `/api/aircraft/${ac.id}/report.csv`;
+  const print = el("a", "btn small", "🖨 Print report");
+  print.href = `/api/aircraft/${ac.id}/report.html?print=1`;
+  print.target = "_blank";
+  tools.appendChild(csv);
+  tools.appendChild(print);
+  view.appendChild(tools);
+
   // Components with update-hours
   view.appendChild(el("div", "section-title", "Components"));
   const strip = el("div", "comp-strip");
@@ -239,14 +259,65 @@ function itemRow(it) {
   row.appendChild(el("div", "", statusChip(c.status)));
 
   const actions = el("div", "i-actions");
+  const hist = el("button", "btn small", "History");
+  hist.onclick = () => historyModal(it);
   const log = el("button", "btn small primary", "Log");
   log.onclick = () => logCompletionModal(it);
+  actions.appendChild(hist);
   actions.appendChild(log);
   row.appendChild(actions);
   return row;
 }
 
 const lightFor = (s) => (s === "overdue" ? "red" : s === "due_soon" ? "amber" : s === "ok" ? "green" : "grey");
+
+// --- calendar / timeline -----------------------------------------------------
+
+async function renderCalendar() {
+  view.innerHTML = '<div class="loading">Loading timeline…</div>';
+  let data;
+  try { data = await api("/calendar"); } catch (e) { return showError(e); }
+
+  view.innerHTML = "";
+  view.appendChild(el("h1", "page", "Timeline"));
+  view.appendChild(el("p", "sub",
+    "Every tracked item by due date. Hours-based items show their projected date (≈)."));
+
+  if (!data.entries.length) { view.appendChild(el("div", "empty", "Nothing to show.")); return; }
+
+  // Group: Overdue bucket first, then by calendar month.
+  const groups = new Map();
+  data.entries.forEach((e) => {
+    let key, label;
+    if (e.remaining_days != null && e.remaining_days < 0) { key = "0000-00"; label = "Overdue"; }
+    else {
+      const d = new Date(e.due_date + "T00:00:00");
+      key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      label = `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+    }
+    if (!groups.has(key)) groups.set(key, { label, items: [] });
+    groups.get(key).items.push(e);
+  });
+
+  [...groups.keys()].sort().forEach((key) => {
+    const g = groups.get(key);
+    view.appendChild(el("div", "section-title", `${g.label} (${g.items.length})`));
+    g.items.forEach((e) => {
+      const r = el("div", "alert " + (e.status === "overdue" ? "overdue" : e.status === "due_soon" ? "due_soon" : ""));
+      r.appendChild(el("span", "light " + lightFor(e.status)));
+      const main = el("div", "a-main");
+      const aw = e.is_required_for_airworthiness ? ' <span class="chip aw">AW</span>' : "";
+      main.appendChild(el("div", "a-name", esc(e.name) + aw));
+      main.appendChild(el("div", "a-sub",
+        `<span class="a-tail">${esc(e.tail_number)}</span> · ${e.projected ? "≈ " : ""}${fmtDate(e.due_date)}` +
+        (e.component_position ? ` · ${esc(e.component_position)}` : "")));
+      r.appendChild(main);
+      r.appendChild(el("div", "", statusChip(e.status)));
+      r.onclick = () => go(`#/aircraft/${e.aircraft_id}`);
+      view.appendChild(r);
+    });
+  });
+}
 
 // --- modals ------------------------------------------------------------------
 
@@ -289,6 +360,8 @@ function logCompletionModal(it) {
     `<div class="field"><label>Vendor</label><input name="vendor"></div>` +
     `<div class="field"><label>Cost ($)</label><input name="cost" type="number" step="0.01"></div></div>`);
   form.appendChild(field("Notes", `<textarea name="notes" rows="2"></textarea>`));
+  form.appendChild(field("Attach document (work order, 8130, repack card…)",
+    `<input name="doc" type="file">`));
 
   const actions = el("div", "actions");
   const cancel = el("button", "btn", "Cancel"); cancel.type = "button";
@@ -313,11 +386,63 @@ function logCompletionModal(it) {
     };
     save.disabled = true;
     try {
-      await api(`/items/${it.id}/events`, { method: "POST", body: JSON.stringify(payload) });
+      const res = await api(`/items/${it.id}/events`, { method: "POST", body: JSON.stringify(payload) });
+      const fileInput = form.querySelector('input[name="doc"]');
+      if (fileInput.files.length && res.event_id) {
+        await uploadFile(res.event_id, fileInput.files[0]);
+      }
       m.close();
       renderAircraft(CURRENT_AIRCRAFT.id);
     } catch (err) { alert("Error: " + err.message); save.disabled = false; }
   };
+}
+
+async function uploadFile(eventId, file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`/api/events/${eventId}/attachments`, { method: "POST", body: fd });
+  if (!res.ok) throw new Error("Upload failed");
+  return res.json();
+}
+
+async function historyModal(it) {
+  const body = el("div");
+  body.innerHTML = '<div class="loading">Loading…</div>';
+  const m = openModal(`History: ${it.name}`, "Completion log and documents.", body);
+  let events;
+  try { events = await api(`/items/${it.id}/events`); }
+  catch (e) { body.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+
+  body.innerHTML = "";
+  if (!events.length) { body.appendChild(el("div", "empty", "No completions logged yet.")); return; }
+  events.forEach((ev) => {
+    const card = el("div", "hist");
+    const head = `<b>${fmtDate(ev.performed_date)}</b>` +
+      (ev.performed_at_hours != null ? ` · ${(+ev.performed_at_hours).toLocaleString()} h` : "");
+    card.appendChild(el("div", "h-head", head));
+    const meta = [ev.performed_by, ev.signed_off_by, ev.vendor].filter(Boolean).join(" · ");
+    if (meta) card.appendChild(el("div", "h-meta", esc(meta)));
+    if (ev.notes) card.appendChild(el("div", "h-meta", esc(ev.notes)));
+
+    const docs = el("div", "h-docs");
+    ev.attachments.forEach((a) => {
+      const link = el("a", "doc-chip", `📎 ${esc(a.filename)}`);
+      link.href = `/api/attachments/${a.id}/download`;
+      link.target = "_blank";
+      docs.appendChild(link);
+    });
+    const up = el("label", "doc-chip add", "＋ Add document");
+    const fi = el("input"); fi.type = "file"; fi.style.display = "none";
+    fi.onchange = async () => {
+      if (!fi.files.length) return;
+      try { await uploadFile(ev.id, fi.files[0]); historyModal(it); m.close(); }
+      catch (e) { alert("Error: " + e.message); }
+    };
+    up.appendChild(fi);
+    docs.appendChild(up);
+    card.appendChild(docs);
+    body.appendChild(card);
+  });
 }
 
 function updateHoursModal(comp) {

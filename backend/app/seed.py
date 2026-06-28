@@ -1,7 +1,7 @@
-"""Create tables, seed the item-type catalog, and optionally a demo fleet.
+"""Create tables, seed the item-type catalog, and optionally the SBSF fleet.
 
 Run directly:  python -m app.seed            (catalog only, idempotent)
-               python -m app.seed --demo     (also create a demo fleet)
+               python -m app.seed --demo     (also create the SBSF fleet)
 """
 
 from __future__ import annotations
@@ -13,7 +13,6 @@ from .catalog import CATALOG
 from .database import Base, SessionLocal, engine
 from .models import (
     Aircraft,
-    ComplianceEvent,
     ComplianceItem,
     Component,
     HoursReading,
@@ -35,8 +34,11 @@ def seed_catalog(db) -> int:
     return len(CATALOG)
 
 
+def _by_name(name: str) -> dict:
+    return next(e for e in CATALOG if e["name"] == name)
+
+
 def _item_from_catalog(entry: dict, **overrides) -> ComplianceItem:
-    """Build a ComplianceItem mirroring a catalog entry's defaults."""
     item = ComplianceItem(
         name=entry["name"],
         category=entry["category"],
@@ -53,145 +55,185 @@ def _item_from_catalog(entry: dict, **overrides) -> ComplianceItem:
     return item
 
 
-def _by_name(name: str) -> dict:
-    return next(e for e in CATALOG if e["name"] == name)
+def _add(db, ac, comp, today, name, *, months_ago=None, expiry_days=None,
+         hours_to_go=None, cycles_to_go=None, date_months_ago=None):
+    """Create one tracked item from the catalog with a chosen 'remaining' state."""
+    entry = _by_name(name)
+    kw = dict(aircraft_id=ac.id, component_id=comp.id if comp else None)
+
+    # months_ago / date_months_ago use the negative-is-past convention,
+    # e.g. months_ago=-2 means "last performed two months ago".
+    if months_ago is not None:
+        kw["last_done_date"] = _months_ago(today, months_ago)
+    if expiry_days is not None:
+        kw["fixed_expiry_date"] = today + timedelta(days=expiry_days)
+    if hours_to_go is not None and comp is not None:
+        interval = entry["default_interval_hours"]
+        kw["last_done_hours"] = round(comp.current_hours - (interval - hours_to_go), 1)
+    if cycles_to_go is not None and comp is not None:
+        interval_c = entry["default_interval_cycles"]
+        kw["last_done_cycles"] = int(comp.current_cycles - (interval_c - cycles_to_go))
+    if date_months_ago is not None:
+        kw["last_done_date"] = _months_ago(today, date_months_ago)
+
+    db.add(_item_from_catalog(entry, **kw))
+
+
+def _component(db, ac, today, ctype, position, hours, *, cyc_ratio=1.0,
+               make=None, model=None, readings_per_month=18):
+    c = Component(
+        aircraft_id=ac.id, type=ctype, position=position, make=make, model=model,
+        current_hours=hours, current_cycles=int(hours * cyc_ratio), hours_as_of=today,
+    )
+    db.add(c)
+    db.flush()
+    _seed_readings(db, c, today, per_month=readings_per_month)
+    return c
 
 
 def seed_demo(db) -> None:
-    """Create a small demo fleet with a realistic mix of statuses."""
+    """Create the SBSF warbird/vintage fleet with a realistic mix of statuses."""
     if db.query(Aircraft).count() > 0:
         return
     today = date.today()
 
-    fleet = [
-        dict(tail="N512SF", make="Cessna", model="208B Grand Caravan",
-             serial="208B-1234", year=2014, base="KPIT", engines=1,
-             af_hours=3850.0, eng_hours=3850.0, twin=False),
-        dict(tail="N88SB", make="Beechcraft", model="B200 King Air",
-             serial="BB-1789", year=2009, base="KAGC", engines=2,
-             af_hours=6120.0, eng_hours=2100.0, twin=True),
-        dict(tail="N304CH", make="Cirrus", model="SR22T",
-             serial="1102", year=2018, base="KPIT", engines=1,
-             af_hours=1480.0, eng_hours=1480.0, twin=False),
-        dict(tail="N17SF", make="Piper", model="PA-46 Malibu",
-             serial="4636210", year=2006, base="KBVI", engines=1,
-             af_hours=2760.0, eng_hours=620.0, twin=False),
-    ]
-
-    for spec in fleet:
-        ac = Aircraft(
-            tail_number=spec["tail"], make=spec["make"], model=spec["model"],
-            serial_number=spec["serial"], year=spec["year"],
-            home_base=spec["base"], status="active",
-        )
-        db.add(ac)
-        db.flush()
-
-        # --- Components ---
-        airframe = Component(
-            aircraft_id=ac.id, type="airframe", position="Airframe",
-            make=spec["make"], model=spec["model"], serial_number=spec["serial"],
-            current_hours=spec["af_hours"], current_cycles=int(spec["af_hours"] * 1.3),
-            hours_as_of=today,
-        )
-        db.add(airframe)
-        db.flush()
-        _seed_readings(db, airframe, today, per_month=22)
-
-        engines = []
-        for i in range(spec["engines"]):
-            eng = Component(
-                aircraft_id=ac.id, type="engine",
-                position=f"Engine #{i + 1}" if spec["twin"] else "Engine",
-                current_hours=spec["eng_hours"], current_cycles=int(spec["eng_hours"] * 1.3),
-                hours_as_of=today,
-            )
-            db.add(eng)
-            db.flush()
-            _seed_readings(db, eng, today, per_month=22)
-            engines.append(eng)
-
-        prop = Component(
-            aircraft_id=ac.id, type="propeller", position="Propeller",
-            current_hours=spec["eng_hours"], current_cycles=int(spec["eng_hours"] * 1.3),
-            hours_as_of=today,
-        )
-        db.add(prop)
-        db.flush()
-
-        # --- Airframe-level calendar / equipment items (varied statuses) ---
-        # offsets_months: how long ago the item was last done, to create a mix.
-        airframe_items = [
-            ("Annual inspection", -2),          # OK (10 months left on 12mo)
-            ("Transponder check", -23),         # DUE_SOON (1 month left on 24mo)
-            ("Altimeter / pitot-static system check", -25),  # OVERDUE
-            ("ELT inspection", -11),            # DUE_SOON
-            ("Fire extinguisher inspection", -5),
-            ("Life vests inspection", -13),     # OVERDUE
-            ("100-hour inspection", None),      # hours-based, see below
-        ]
-        for name, off in airframe_items:
-            entry = _by_name(name)
-            if entry["interval_kind"] == "hours":
-                last_h = airframe.current_hours - 70  # 30h to go on 100h
-                item = _item_from_catalog(
-                    entry, aircraft_id=ac.id, component_id=airframe.id,
-                    last_done_hours=last_h, last_done_date=today - timedelta(days=60),
-                )
-            else:
-                item = _item_from_catalog(
-                    entry, aircraft_id=ac.id, component_id=airframe.id,
-                    last_done_date=_months_ago(today, off),
-                )
-            db.add(item)
-
-        # --- Fixed-expiry equipment items ---
-        fixed_items = [
-            ("ELT battery replacement", 400),   # OK
-            ("Aircraft registration", 900),     # OK
-            ("First aid / medical kit", 20),    # DUE_SOON
-            ("Flares / pyrotechnic signals", -10),  # OVERDUE (10 days ago)
-        ]
-        for name, days in fixed_items:
-            entry = _by_name(name)
-            item = _item_from_catalog(
-                entry, aircraft_id=ac.id, component_id=airframe.id,
-                fixed_expiry_date=today + timedelta(days=days),
-            )
-            db.add(item)
-
-        # --- Engine items (hours / combo) ---
-        for eng in engines:
-            # Oil change: 50h or 4mo whichever first; ~12h to go.
-            oil = _by_name("Oil & filter change")
-            db.add(_item_from_catalog(
-                oil, aircraft_id=ac.id, component_id=eng.id,
-                last_done_hours=eng.current_hours - 38,
-                last_done_date=today - timedelta(days=40),
-            ))
-            # Magneto: 500h
-            mag = _by_name("Magneto inspection")
-            db.add(_item_from_catalog(
-                mag, aircraft_id=ac.id, component_id=eng.id,
-                last_done_hours=eng.current_hours - 460,  # 40h to go
-                last_done_date=today - timedelta(days=300),
-            ))
-            # TBO
-            tbo = _by_name("Engine overhaul (TBO)")
-            db.add(_item_from_catalog(
-                tbo, aircraft_id=ac.id, component_id=eng.id,
-                last_done_hours=0.0, last_done_date=_months_ago(today, -60),
-            ))
-
-        # --- Propeller overhaul ---
-        po = _by_name("Propeller overhaul")
-        db.add(_item_from_catalog(
-            po, aircraft_id=ac.id, component_id=prop.id,
-            last_done_hours=0.0, last_done_date=_months_ago(today, -50),
-        ))
-
+    _seed_pby(db, today)
+    _seed_p40(db, today)
+    _seed_ad4(db, today)
+    _seed_uh1(db, today)
     db.commit()
 
+
+# --- common airframe items (regulatory + emergency) --------------------------
+
+def _common_airframe(db, ac, af, today, *, overdue_altimeter=True):
+    _add(db, ac, af, today, "Condition inspection (annual)", months_ago=-2)        # OK
+    _add(db, ac, af, today, "Transponder check", months_ago=-23)                   # due soon
+    _add(db, ac, af, today, "Altimeter / pitot-static system check",
+         months_ago=-25 if overdue_altimeter else -3)                              # overdue/ok
+    _add(db, ac, af, today, "ELT inspection", months_ago=-11)                      # due soon
+    _add(db, ac, af, today, "ELT battery replacement", expiry_days=480)            # OK
+    _add(db, ac, af, today, "Aircraft registration", expiry_days=1000)             # OK
+    _add(db, ac, af, today, "Fire extinguisher inspection", months_ago=-6)         # OK
+    _add(db, ac, af, today, "First aid / medical kit", expiry_days=22)             # due soon
+
+
+# --- PBY-5A Catalina (twin R-1830 radial amphibian) --------------------------
+
+def _seed_pby(db, today):
+    ac = Aircraft(tail_number="N314PB", make="Consolidated", model="PBY-5A Catalina",
+                  serial_number="CV-417", year=1943, home_base="KAGC", status="active",
+                  notes="Amphibious flying boat; twin Pratt & Whitney R-1830 Twin Wasp.")
+    db.add(ac); db.flush()
+    af = _component(db, ac, today, "airframe", "Airframe", 4180.0, cyc_ratio=0.9,
+                    make="Consolidated", model="PBY-5A")
+    e1 = _component(db, ac, today, "engine", "Engine #1", 5210.0, make="P&W", model="R-1830")
+    e2 = _component(db, ac, today, "engine", "Engine #2", 5185.0, make="P&W", model="R-1830")
+    p1 = _component(db, ac, today, "propeller", "Propeller #1", 5210.0)
+    p2 = _component(db, ac, today, "propeller", "Propeller #2", 5185.0)
+
+    _common_airframe(db, ac, af, today)
+    _add(db, ac, af, today, "Hull / float inspection", months_ago=-13)             # overdue
+    _add(db, ac, af, today, "Landing gear retraction inspection", months_ago=-2)
+    _add(db, ac, af, today, "Life raft repack / recertification", months_ago=-10)  # due soon
+    _add(db, ac, af, today, "Life vests inspection", months_ago=-7)
+    _add(db, ac, af, today, "Flares / pyrotechnic signals", expiry_days=-6)        # overdue
+
+    for eng, prop in ((e1, p1), (e2, p2)):
+        _add(db, ac, eng, today, "Oil & filter change", hours_to_go=9, date_months_ago=-3)
+        _add(db, ac, eng, today, "Cylinder compression check", months_ago=-11)     # due soon
+        _add(db, ac, eng, today, "Magneto inspection", hours_to_go=60)
+        _add(db, ac, eng, today, "Engine top overhaul", hours_to_go=90)
+        _add(db, ac, eng, today, "Engine overhaul (TBO)", hours_to_go=180, date_months_ago=-90)
+        _add(db, ac, prop, today, "Propeller overhaul", hours_to_go=260, date_months_ago=-40)
+
+
+# --- P-40N-1 Warhawk (single Allison V-1710 inline) --------------------------
+
+def _seed_p40(db, today):
+    ac = Aircraft(tail_number="NX340P", make="Curtiss", model="P-40N-1 Warhawk",
+                  serial_number="28954", year=1943, home_base="KAGC", status="active",
+                  notes="Single Allison V-1710 liquid-cooled inline.")
+    db.add(ac); db.flush()
+    af = _component(db, ac, today, "airframe", "Airframe", 3120.0, cyc_ratio=1.1,
+                    make="Curtiss", model="P-40N")
+    eng = _component(db, ac, today, "engine", "Engine", 470.0, make="Allison", model="V-1710")
+    prop = _component(db, ac, today, "propeller", "Propeller", 470.0)
+
+    _common_airframe(db, ac, af, today)
+    _add(db, ac, af, today, "Life vests inspection", months_ago=-4)
+
+    _add(db, ac, eng, today, "Oil & filter change", hours_to_go=6, date_months_ago=-3)  # due soon
+    _add(db, ac, eng, today, "Coolant system inspection", months_ago=-13)          # overdue
+    _add(db, ac, eng, today, "Magneto inspection", hours_to_go=130)
+    _add(db, ac, eng, today, "Spark plug service", hours_to_go=45)
+    _add(db, ac, eng, today, "Engine overhaul (TBO)", hours_to_go=330, date_months_ago=-30)
+    _add(db, ac, prop, today, "Propeller overhaul", hours_to_go=420, date_months_ago=-30)
+
+
+# --- AD-4N Skyraider (single Wright R-3350 radial) ---------------------------
+
+def _seed_ad4(db, today):
+    ac = Aircraft(tail_number="N4DN", make="Douglas", model="AD-4N Skyraider",
+                  serial_number="7722", year=1951, home_base="KBVI", status="active",
+                  notes="Single Wright R-3350 radial.")
+    db.add(ac); db.flush()
+    af = _component(db, ac, today, "airframe", "Airframe", 2580.0, cyc_ratio=1.0,
+                    make="Douglas", model="AD-4N")
+    eng = _component(db, ac, today, "engine", "Engine", 310.0, make="Wright", model="R-3350")
+    prop = _component(db, ac, today, "propeller", "Propeller", 310.0)
+
+    _add(db, ac, af, today, "Condition inspection (annual)", months_ago=-11)       # due soon
+    _add(db, ac, af, today, "Transponder check", months_ago=-2)
+    _add(db, ac, af, today, "Altimeter / pitot-static system check", months_ago=-2)
+    _add(db, ac, af, today, "ELT inspection", months_ago=-1)
+    _add(db, ac, af, today, "ELT battery replacement", expiry_days=12)             # due soon
+    _add(db, ac, af, today, "Aircraft registration", expiry_days=1300)
+    _add(db, ac, af, today, "Fire extinguisher inspection", months_ago=-13)        # overdue
+    _add(db, ac, af, today, "First aid / medical kit", expiry_days=200)
+    _add(db, ac, af, today, "Flares / pyrotechnic signals", expiry_days=-3)        # overdue
+
+    _add(db, ac, eng, today, "Oil & filter change", hours_to_go=3, date_months_ago=-3)  # due soon
+    _add(db, ac, eng, today, "Cylinder compression check", months_ago=-2)
+    _add(db, ac, eng, today, "Magneto inspection", hours_to_go=18)                 # due soon
+    _add(db, ac, eng, today, "Engine top overhaul", hours_to_go=420)
+    _add(db, ac, eng, today, "Engine overhaul (TBO)", hours_to_go=600, date_months_ago=-20)
+    _add(db, ac, prop, today, "Propeller overhaul", hours_to_go=900, date_months_ago=-20)
+
+
+# --- UH-1 Huey (turbine helicopter) ------------------------------------------
+
+def _seed_uh1(db, today):
+    ac = Aircraft(tail_number="N118HU", make="Bell", model="UH-1H Iroquois (Huey)",
+                  serial_number="66-16718", year=1966, home_base="KPIT", status="active",
+                  notes="Turbine helicopter; Lycoming T53. Tracks rotor & drivetrain "
+                        "time-life components by hours and cycles.")
+    db.add(ac); db.flush()
+    af = _component(db, ac, today, "airframe", "Airframe", 3760.0, cyc_ratio=1.4,
+                    make="Bell", model="UH-1H")
+    eng = _component(db, ac, today, "engine", "Engine", 640.0, make="Lycoming", model="T53-L-13")
+    mr = _component(db, ac, today, "main_rotor", "Main rotor", 1980.0, cyc_ratio=4.0)
+    tr = _component(db, ac, today, "tail_rotor", "Tail rotor", 1980.0, cyc_ratio=4.0)
+    tx = _component(db, ac, today, "transmission", "Main transmission", 1980.0)
+    g42 = _component(db, ac, today, "gearbox", "42° gearbox", 1980.0)
+    g90 = _component(db, ac, today, "gearbox", "90° gearbox", 1980.0)
+
+    _common_airframe(db, ac, af, today)
+    _add(db, ac, af, today, "Hydraulic system inspection", hours_to_go=20)         # due soon
+
+    _add(db, ac, eng, today, "Oil & filter change", hours_to_go=14, date_months_ago=-2)
+    _add(db, ac, eng, today, "Hot section inspection", hours_to_go=80)
+    _add(db, ac, eng, today, "Engine overhaul (TBO)", hours_to_go=220, date_months_ago=-40)
+
+    _add(db, ac, mr, today, "Main rotor blade retirement", hours_to_go=130, cycles_to_go=600)  # due soon
+    _add(db, ac, mr, today, "Main rotor hub & grip inspection", hours_to_go=45)
+    _add(db, ac, tr, today, "Tail rotor blade retirement", hours_to_go=300)
+    _add(db, ac, tx, today, "Main transmission overhaul", hours_to_go=170)
+    _add(db, ac, g42, today, "42° / intermediate gearbox overhaul", hours_to_go=400)
+    _add(db, ac, g90, today, "90° / tail rotor gearbox overhaul", hours_to_go=350)
+
+
+# --- helpers -----------------------------------------------------------------
 
 def _seed_readings(db, component, today: date, per_month: float) -> None:
     """Add a few months of hour readings so the projection has real data."""
@@ -202,7 +244,8 @@ def _seed_readings(db, component, today: date, per_month: float) -> None:
         db.add(HoursReading(
             component_id=component.id, reading_date=d,
             hours=round(max(hours, 0.0), 1),
-            cycles=int(max(hours, 0.0) * 1.3), source="manual",
+            cycles=int(max(hours, 0.0) * (component.current_cycles / max(component.current_hours, 1))),
+            source="manual",
         ))
 
 
@@ -223,7 +266,7 @@ def main() -> None:
         print(f"Catalog item types: +{added} (existing kept).")
         if "--demo" in sys.argv:
             seed_demo(db)
-            print(f"Demo fleet: {db.query(Aircraft).count()} aircraft, "
+            print(f"Fleet: {db.query(Aircraft).count()} aircraft, "
                   f"{db.query(ComplianceItem).count()} tracked items.")
     finally:
         db.close()

@@ -102,5 +102,30 @@ def serialize_item(db: Session, item: ComplianceItem, *, today: Optional[date] =
     }
 
 
+def serialize_event(event) -> dict:
+    """A completion event including its attachments."""
+    return {
+        "id": event.id,
+        "compliance_item_id": event.compliance_item_id,
+        "performed_date": _iso(event.performed_date),
+        "performed_at_hours": event.performed_at_hours,
+        "performed_at_cycles": event.performed_at_cycles,
+        "performed_by": event.performed_by,
+        "signed_off_by": event.signed_off_by,
+        "vendor": event.vendor,
+        "cost": event.cost,
+        "notes": event.notes,
+        "attachments": [
+            {
+                "id": a.id,
+                "filename": a.filename,
+                "content_type": a.content_type,
+                "size_bytes": a.size_bytes,
+            }
+            for a in event.attachments
+        ],
+    }
+
+
 def _iso(d) -> Optional[str]:
     return d.isoformat() if d is not None else None

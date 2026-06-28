@@ -51,12 +51,12 @@ def delete_item(item_id: int, db: Session = Depends(get_db)):
     db.commit()
 
 
-@router.get("/items/{item_id}/events", response_model=list[EventOut])
+@router.get("/items/{item_id}/events")
 def list_events(item_id: int, db: Session = Depends(get_db)):
     item = db.get(ComplianceItem, item_id)
     if not item:
         raise HTTPException(404, "Item not found")
-    return item.events
+    return [service.serialize_event(e) for e in item.events]
 
 
 @router.post("/items/{item_id}/events", status_code=201)
@@ -97,7 +97,8 @@ def log_event(item_id: int, payload: EventIn, db: Session = Depends(get_db)):
 
     db.commit()
     db.refresh(item)
-    return service.serialize_item(db, item)
+    db.refresh(event)
+    return {"item": service.serialize_item(db, item), "event_id": event.id}
 
 
 @router.post("/aircraft/{aircraft_id}/seed-from-catalog")

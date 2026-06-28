@@ -4,6 +4,13 @@
 **Status:** Draft for review (v0.1)
 **Date:** 2026-06-28
 
+> **Implementation status:** Phase 1 (core tracking) and most of Phase 2 are
+> built — see the repository `README.md`. Delivered: the compliance engine,
+> REST API, responsive PWA (dashboard, aircraft detail, timeline), document
+> attachments, and CSV/printable report export. The demo seed is the real SBSF
+> fleet (PBY-5A, P-40N, AD-4N, UH-1). Not yet built: outbound email/SMS
+> notifications (alerts are currently in-app only) and authentication/roles.
+
 ---
 
 ## 1. Purpose
