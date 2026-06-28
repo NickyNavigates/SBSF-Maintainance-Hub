@@ -1,7 +1,7 @@
 # SBSF Maintenance Hub
 
-Aircraft compliance & maintenance tracking for the Superior Steel Fab flight
-department. Tracks every recurring item per aircraft — **calendar** items
+Aircraft compliance & maintenance tracking for the Soaring by the Sea
+Foundation (SBSF). Tracks every recurring item per aircraft — **calendar** items
 (annual, transponder, pitot-static, ELT, registration, emergency equipment)
 and **hours/cycle** items (oil changes, 100-hr, TBO, mags, props, ADs) — and
 shows what is **due soon** or **overdue** across the fleet.
@@ -40,10 +40,10 @@ cycles:
 
 | Tail | Aircraft | Notable components |
 |------|----------|--------------------|
-| N314PB | Consolidated **PBY-5A Catalina** | Twin R-1830 radials, 2 props, hull/float & gear-retraction |
-| NX340P | Curtiss **P-40N-1 Warhawk** | Allison V-1710 inline (coolant system) |
-| N4DN | Douglas **AD-4N Skyraider** | Wright R-3350 radial |
-| N118HU | Bell **UH-1H Huey** | T53 turbine, main/tail rotor, transmission, 42°/90° gearboxes |
+| N9767 | Consolidated **PBY-5A Catalina** "Princess of the Stars" | Twin R-1830 radials, 2 props, hull/float & gear-retraction |
+| N4730 | Curtiss **P-40N-1 Warhawk** "Currawong" | Allison V-1710 inline (coolant system) |
+| N5716 | Douglas **AD-4N Skyraider** | Wright R-3350 radial |
+| N6828 | Bell **UH-1H Huey** | T53 turbine, main/tail rotor, transmission, 42°/90° gearboxes |
 
 ## Quick start
 

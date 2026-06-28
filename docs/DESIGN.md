@@ -1,6 +1,6 @@
 # SBSF Maintenance Hub — Design Document
 
-**Owner:** Superior Steel Fab (SBSF) Flight Department
+**Owner:** Soaring by the Sea Foundation (SBSF)
 **Status:** Draft for review (v0.1)
 **Date:** 2026-06-28
 

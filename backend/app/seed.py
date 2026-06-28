@@ -121,9 +121,10 @@ def _common_airframe(db, ac, af, today, *, overdue_altimeter=True):
 # --- PBY-5A Catalina (twin R-1830 radial amphibian) --------------------------
 
 def _seed_pby(db, today):
-    ac = Aircraft(tail_number="N314PB", make="Consolidated", model="PBY-5A Catalina",
-                  serial_number="CV-417", year=1943, home_base="KAGC", status="active",
-                  notes="Amphibious flying boat; twin Pratt & Whitney R-1830 Twin Wasp.")
+    ac = Aircraft(tail_number="N9767", make="Consolidated", model="PBY-5A Catalina",
+                  serial_number="9767", year=1943, home_base="KEUG", status="active",
+                  notes="'Princess of the Stars' — ex-RCAF 9767, 162 Sqn U-boat patrol. "
+                        "Amphibious flying boat; twin Pratt & Whitney R-1830 Twin Wasp.")
     db.add(ac); db.flush()
     af = _component(db, ac, today, "airframe", "Airframe", 4180.0, cyc_ratio=0.9,
                     make="Consolidated", model="PBY-5A")
@@ -151,9 +152,10 @@ def _seed_pby(db, today):
 # --- P-40N-1 Warhawk (single Allison V-1710 inline) --------------------------
 
 def _seed_p40(db, today):
-    ac = Aircraft(tail_number="NX340P", make="Curtiss", model="P-40N-1 Warhawk",
-                  serial_number="28954", year=1943, home_base="KAGC", status="active",
-                  notes="Single Allison V-1710 liquid-cooled inline.")
+    ac = Aircraft(tail_number="N4730", make="Curtiss", model="P-40N-1 Warhawk",
+                  serial_number="A29-448", year=1943, home_base="KEUG", status="active",
+                  notes="'Currawong' — ex-RAAF A29-448, 75 Sqn; Pappy Boyington tribute "
+                        "markings. Single Allison V-1710 liquid-cooled inline.")
     db.add(ac); db.flush()
     af = _component(db, ac, today, "airframe", "Airframe", 3120.0, cyc_ratio=1.1,
                     make="Curtiss", model="P-40N")
@@ -174,9 +176,10 @@ def _seed_p40(db, today):
 # --- AD-4N Skyraider (single Wright R-3350 radial) ---------------------------
 
 def _seed_ad4(db, today):
-    ac = Aircraft(tail_number="N4DN", make="Douglas", model="AD-4N Skyraider",
-                  serial_number="7722", year=1951, home_base="KBVI", status="active",
-                  notes="Single Wright R-3350 radial.")
+    ac = Aircraft(tail_number="N5716", make="Douglas", model="AD-4N Skyraider",
+                  serial_number="125716", year=1952, home_base="KEUG", status="active",
+                  notes="Ex-French F-AZFN; USMC VMC-1 Korea, later French service in "
+                        "Algeria & Chad. Single Wright R-3350 radial.")
     db.add(ac); db.flush()
     af = _component(db, ac, today, "airframe", "Airframe", 2580.0, cyc_ratio=1.0,
                     make="Douglas", model="AD-4N")
@@ -204,8 +207,8 @@ def _seed_ad4(db, today):
 # --- UH-1 Huey (turbine helicopter) ------------------------------------------
 
 def _seed_uh1(db, today):
-    ac = Aircraft(tail_number="N118HU", make="Bell", model="UH-1H Iroquois (Huey)",
-                  serial_number="66-16718", year=1966, home_base="KPIT", status="active",
+    ac = Aircraft(tail_number="N6828", make="Bell", model="UH-1H Iroquois (Huey)",
+                  serial_number="66-16828", year=1966, home_base="KEUG", status="active",
                   notes="Turbine helicopter; Lycoming T53. Tracks rotor & drivetrain "
                         "time-life components by hours and cycles.")
     db.add(ac); db.flush()
